@@ -1,13 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import './App.css'
 
 function App() {
   const [url, setUrl] = useState('')
   const [activeTab, setActiveTab] = useState('home')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isListening, setIsListening] = useState(false)
+  const [videoInfo, setVideoInfo] = useState(null)
+  const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState('')
-  const recognitionRef = useRef(null)
 
   const platforms = [
     { name: 'TikTok', color: '#ff0050', icon: '🎵' },
@@ -21,13 +20,12 @@ function App() {
     { title: 'Instagram Reel #2024', platform: 'Instagram', time: '৫ ঘণ্টা আগে', icon: '📸' },
   ]
 
-  // Toast notification
   const showToast = (msg) => {
     setToast(msg)
     setTimeout(() => setToast(''), 2500)
   }
 
-  // Clipboard paste
+  // Paste from clipboard
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText()
@@ -37,71 +35,76 @@ function App() {
       showToast('❌ Clipboard পড়া যায়নি')
     }
   }
-
-  // Voice Search
-  const handleVoiceSearch = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    
-    if (!SpeechRecognition) {
-      showToast('❌ আপনার ব্রাউজারে Voice সাপোর্ট করে না')
-      return
-    }
-
-    if (isListening) {
-      recognitionRef.current?.stop()
-      setIsListening(false)
-      return
-    }
-
-    const recognition = new SpeechRecognition()
-    recognition.lang = 'bn-BD'
-    recognition.continuous = false
-    recognition.interimResults = false
-
-    recognition.onstart = () => {
-      setIsListening(true)
-      showToast('🎤 বলুন...')
-    }
-
-    recognition.onresult = (event) => {
-      const text = event.results[0][0].transcript
-      setSearchQuery(text)
-      showToast('✅ ' + text)
-    }
-
-    recognition.onerror = () => {
-      setIsListening(false)
-      showToast('❌ ভয়েস শোনা যায়নি')
-    }
-
-    recognition.onend = () => setIsListening(false)
-
-    recognition.start()
-    recognitionRef.current = recognition
+// Fetch video from TikWM API
+const handleFetch = async () => {
+  if (!url || !url.includes('http')) {
+    showToast('⚠️ সঠিক ভিডিও লিংক দিন')
+    return
   }
 
-  // Download trigger
-  const handleDownload = () => {
-    if (!url) {
-      showToast('⚠️ আগে লিংক দিন')
-      return
-    }
-    showToast('⏳ Ad দেখার পর ডাউনলোড হবে (কাল থেকে)')
-  }
+  setLoading(true)
+  setVideoInfo(null)
 
-  // Telegram actions
-  const openTelegram = (type) => {
-const links = {
-  rate: 'https://t.me/foysal_vai_yt_oficial',
-  feedback: 'https://t.me/foysal_vai_yt_oficial',
-  premium: 'https://t.me/foysal_vai_yt_oficial',
-  share: 'https://t.me/share/url?url=https://vidsavebd.vercel.app&text=VidSave BD - সেরা ভিডিও ডাউনলোডার!',
+  try {
+    const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`
+    const response = await fetch(apiUrl)
+    const data = await response.json()
+
+    if (data.code === 0 && data.data) {
+      setVideoInfo({
+        title: data.data.title || 'TikTok Video',
+        cover: data.data.cover,
+        play: data.data.play,
+        hdplay: data.data.hdplay,
+        music: data.data.music,
+        duration: data.data.duration,
+        size: data.data.size,
+        hd_size: data.data.hd_size,
+      })
+      showToast('✅ ভিডিও পাওয়া গেছে!')
+    } else {
+      showToast('❌ ভিডিও খুঁজে পাওয়া যায়নি')
+    }
+  } catch (error) {
+    console.error(error)
+    showToast('❌ সমস্যা হয়েছে — আবার চেষ্টা করুন')
+  } finally {
+    setLoading(false)
+  }
 }
+
+  // Download video with ad delay
+  const downloadVideo = (videoUrl) => {
+    showToast('⏳ Ad দেখার পর ডাউনলোড শুরু হবে...')
+    setTimeout(() => {
+      const link = document.createElement('a')
+      link.href = videoUrl
+      link.download = 'vidsave-video.mp4'
+      link.target = '_blank'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      showToast('✅ ডাউনলোড শুরু!')
+    }, 2000)
+  }
+
+  const reset = () => {
+    setVideoInfo(null)
+    setUrl('')
+  }
+
+  const openTelegram = (type) => {
+    const links = {
+      rate: 'https://t.me/foysal_vai_yt_oficial?text=⭐%20Rate%20Us%20Feedback',
+      feedback: 'https://t.me/foysal_vai_yt_oficial?text=💬%20Feedback:%20',
+      premium: 'https://t.me/foysal_vai_yt_oficial?text=👑%20Premium%20নিতে%20চাই',
+      share: 'https://t.me/share/url?url=https://vidsavebd.vercel.app&text=VidSave BD - সেরা ভিডিও ডাউনলোডার!',
+    }
     window.open(links[type], '_blank')
     showToast('📱 Telegram খোলা হচ্ছে...')
   }
 
-  // ============ HOME ============
+  // ===== HOME =====
   const renderHome = () => (
     <>
       <div className="premium-card" onClick={() => setActiveTab('premium')}>
@@ -129,30 +132,67 @@ const links = {
         </div>
       </div>
 
-      <div className="input-card">
-        <div className="input-header">
-          <span className="input-icon">🔗</span>
-          <span className="input-label">ভিডিও লিংক পেস্ট করুন</span>
+      {!videoInfo ? (
+        <div className="input-card">
+          <div className="input-header">
+            <span className="input-icon">🔗</span>
+            <span className="input-label">ভিডিও লিংক পেস্ট করুন</span>
+          </div>
+          <div className="input-wrapper">
+            <input
+              type="text"
+              className="url-input"
+              placeholder="https://tiktok.com/..."
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+            <button className="paste-btn" onClick={handlePaste}>📋</button>
+          </div>
+          <button
+            className="fetch-btn"
+            disabled={!url || loading}
+            onClick={handleFetch}
+          >
+            {loading ? '⏳ খোঁজা হচ্ছে...' : '⬇ ভিডিও খুঁজুন'}
+          </button>
         </div>
-        <div className="input-wrapper">
-          <input
-            type="text"
-            className="url-input"
-            placeholder="https://tiktok.com/..."
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-          />
-          <button className="paste-btn" onClick={handlePaste}>📋</button>
+      ) : (
+        <div className="video-preview-card">
+          <div className="video-thumbnail-wrap">
+            <img src={videoInfo.cover} alt="Thumbnail" className="video-thumbnail" />
+            <div className="duration-badge">
+              ⏱️ {Math.floor(videoInfo.duration / 60)}:{String(videoInfo.duration % 60).padStart(2, '0')}
+            </div>
+          </div>
+
+          <h3 className="video-title">{videoInfo.title}</h3>
+
+<div className="quality-options">
+  <button className="quality-btn" onClick={() => downloadVideo(videoInfo.play)}>
+    <span className="quality-label">SD 720p</span>
+    <span className="quality-size">
+      {videoInfo.size ? (videoInfo.size / 1024 / 1024).toFixed(1) + ' MB' : 'N/A'}
+    </span>
+  </button>
+  <button
+    className="quality-btn hd"
+    onClick={() => downloadVideo(videoInfo.hdplay || videoInfo.play)}
+  >
+    <span className="quality-label">HD 1080p</span>
+    <span className="quality-size">
+      {videoInfo.hd_size ? (videoInfo.hd_size / 1024 / 1024).toFixed(1) + ' MB' : 'N/A'}
+    </span>
+  </button>
+  <button className="quality-btn music" onClick={() => downloadVideo(videoInfo.music)}>
+    <span className="quality-label">🎵 MP3</span>
+    <span className="quality-size">Audio</span>
+  </button>
+</div>
+          <button className="reset-btn" onClick={reset}>
+            ← নতুন লিংক
+          </button>
         </div>
-        <button
-          className="fetch-btn"
-          disabled={!url}
-          onClick={handleDownload}
-        >
-          <span>⬇</span>
-          <span>ডাউনলোড শুরু করুন</span>
-        </button>
-      </div>
+      )}
 
       <section className="section">
         <h2 className="section-title">সাপোর্টেড প্ল্যাটফর্ম</h2>
@@ -188,7 +228,7 @@ const links = {
                 <h4>{r.title}</h4>
                 <p>{r.platform} • {r.time}</p>
               </div>
-              <button className="recent-download" onClick={handleDownload}>⬇</button>
+              <button className="recent-download">⬇</button>
             </div>
           ))}
         </div>
@@ -202,7 +242,7 @@ const links = {
     </>
   )
 
-  // ============ SEARCH ============
+  // ===== SEARCH =====
   const renderSearch = () => (
     <div className="page-content">
       <div className="page-header">
@@ -211,31 +251,14 @@ const links = {
       </div>
 
       <div className="search-box">
-        <input
-          type="text"
-          className="search-input"
-          placeholder="কী খুঁজছেন?"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        <button
-          className={`voice-btn ${isListening ? 'listening' : ''}`}
-          onClick={handleVoiceSearch}
-        >
-          {isListening ? '🔴' : '🎤'}
-        </button>
+        <input type="text" className="search-input" placeholder="কী খুঁজছেন?" />
+        <button className="voice-btn">🎤</button>
       </div>
 
       <h3 className="mini-title">জনপ্রিয় সার্চ</h3>
       <div className="tags-grid">
         {['#tiktok', '#instagram', '#reels', '#shorts', '#funny', '#trending'].map((tag) => (
-          <span
-            key={tag}
-            className="tag"
-            onClick={() => setSearchQuery(tag.replace('#', ''))}
-          >
-            {tag}
-          </span>
+          <span key={tag} className="tag">{tag}</span>
         ))}
       </div>
 
@@ -247,7 +270,7 @@ const links = {
           { icon: '👥', name: 'Facebook ভিডিও', count: '620' },
           { icon: '▶', name: 'YouTube Shorts', count: '2.1K' },
         ].map((cat, i) => (
-          <div key={i} className="category-item" onClick={() => showToast('🔍 ' + cat.name)}>
+          <div key={i} className="category-item">
             <span className="cat-icon">{cat.icon}</span>
             <span className="cat-name">{cat.name}</span>
             <span className="cat-count">{cat.count}</span>
@@ -257,7 +280,7 @@ const links = {
     </div>
   )
 
-  // ============ DOWNLOAD ============
+  // ===== DOWNLOAD =====
   const renderDownload = () => (
     <div className="page-content">
       <div className="page-header">
@@ -286,7 +309,7 @@ const links = {
     </div>
   )
 
-  // ============ PREMIUM ============
+  // ===== PREMIUM =====
   const renderPremium = () => (
     <div className="page-content">
       <div className="page-header premium-header">
@@ -326,13 +349,13 @@ const links = {
     </div>
   )
 
-  // ============ PROFILE ============
+  // ===== PROFILE =====
   const renderProfile = () => (
     <div className="page-content">
       <div className="profile-header">
         <div className="profile-avatar">👤</div>
         <h2 className="profile-name">Foysal</h2>
-        <p className="profile-id">@foysal_vai</p>
+        <p className="profile-id">@foysal_vai_yt_oficial</p>
         <div className="profile-stats">
           <div><strong>25</strong><span>ডাউনলোড</span></div>
           <div><strong>0</strong><span>ফ্রি</span></div>
@@ -342,29 +365,19 @@ const links = {
 
       <div className="menu-list">
         <div className="menu-item" onClick={() => openTelegram('rate')}>
-          <span>⭐</span>
-          <span>Rate Us</span>
-          <span className="arrow">→</span>
+          <span>⭐</span><span>Rate Us</span><span className="arrow">→</span>
         </div>
         <div className="menu-item" onClick={() => openTelegram('share')}>
-          <span>📢</span>
-          <span>Share App</span>
-          <span className="arrow">→</span>
+          <span>📢</span><span>Share App</span><span className="arrow">→</span>
         </div>
         <div className="menu-item" onClick={() => openTelegram('feedback')}>
-          <span>💬</span>
-          <span>Feedback</span>
-          <span className="arrow">→</span>
+          <span>💬</span><span>Feedback</span><span className="arrow">→</span>
         </div>
         <div className="menu-item" onClick={() => showToast('📄 শীঘ্রই আসছে')}>
-          <span>📄</span>
-          <span>Privacy Policy</span>
-          <span className="arrow">→</span>
+          <span>📄</span><span>Privacy Policy</span><span className="arrow">→</span>
         </div>
         <div className="menu-item" onClick={() => showToast('ℹ️ VidSave BD v1.0')}>
-          <span>ℹ️</span>
-          <span>About</span>
-          <span className="arrow">→</span>
+          <span>ℹ️</span><span>About</span><span className="arrow">→</span>
         </div>
       </div>
     </div>
@@ -385,19 +398,20 @@ const links = {
     <div className="app">
       <div className="bg-glow bg-glow-1"></div>
       <div className="bg-glow bg-glow-2"></div>
-      <div className="bg-glow bg-glow-3"></div>
 
-      {/* Toast */}
-      {toast && (
-        <div className="toast">{toast}</div>
+      {toast && <div className="toast">{toast}</div>}
+
+      {loading && (
+        <div className="loading-overlay">
+          <div className="spinner"></div>
+          <p>ভিডিও খোঁজা হচ্ছে...</p>
+        </div>
       )}
 
       {activeTab === 'home' && (
         <header className="header">
           <div className="header-left">
-            <div className="logo-box">
-              <span className="logo-icon">⬇</span>
-            </div>
+            <div className="logo-box"><span className="logo-icon">⬇</span></div>
             <div>
               <h1 className="logo-title">VidSave BD</h1>
               <p className="logo-sub">প্রিমিয়াম ডাউনলোডার</p>
@@ -409,9 +423,7 @@ const links = {
         </header>
       )}
 
-      <main className="content">
-        {renderContent()}
-      </main>
+      <main className="content">{renderContent()}</main>
 
       <nav className="bottom-nav">
         {[
