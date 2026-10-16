@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 
 function App() {
@@ -7,6 +7,19 @@ function App() {
   const [videoInfo, setVideoInfo] = useState(null)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState('')
+
+  // ⚠️ AdsGram Init
+  useEffect(() => {
+    const initAd = () => {
+      if (window.Adsgram) {
+        window.AdController = window.Adsgram.init({ blockId: "54202" })
+        console.log('✅ AdsGram loaded')
+      } else {
+        setTimeout(initAd, 500)
+      }
+    }
+    initAd()
+  }, [])
 
   const platforms = [
     { name: 'TikTok', color: '#ff0050', icon: '🎵' },
@@ -25,7 +38,6 @@ function App() {
     setTimeout(() => setToast(''), 2500)
   }
 
-  // Paste from clipboard
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText()
@@ -35,48 +47,49 @@ function App() {
       showToast('❌ Clipboard পড়া যায়নি')
     }
   }
-// Fetch video from TikWM API
-const handleFetch = async () => {
-  if (!url || !url.includes('http')) {
-    showToast('⚠️ সঠিক ভিডিও লিংক দিন')
-    return
-  }
 
-  setLoading(true)
-  setVideoInfo(null)
-
-  try {
-    const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`
-    const response = await fetch(apiUrl)
-    const data = await response.json()
-
-    if (data.code === 0 && data.data) {
-      setVideoInfo({
-        title: data.data.title || 'TikTok Video',
-        cover: data.data.cover,
-        play: data.data.play,
-        hdplay: data.data.hdplay,
-        music: data.data.music,
-        duration: data.data.duration,
-        size: data.data.size,
-        hd_size: data.data.hd_size,
-      })
-      showToast('✅ ভিডিও পাওয়া গেছে!')
-    } else {
-      showToast('❌ ভিডিও খুঁজে পাওয়া যায়নি')
+  const handleFetch = async () => {
+    if (!url || !url.includes('http')) {
+      showToast('⚠️ সঠিক ভিডিও লিংক দিন')
+      return
     }
-  } catch (error) {
-    console.error(error)
-    showToast('❌ সমস্যা হয়েছে — আবার চেষ্টা করুন')
-  } finally {
-    setLoading(false)
-  }
-}
+    setLoading(true)
+    setVideoInfo(null)
 
-  // Download video with ad delay
+    try {
+      const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`
+      const response = await fetch(apiUrl)
+      const data = await response.json()
+
+      if (data.code === 0 && data.data) {
+        setVideoInfo({
+          title: data.data.title || 'TikTok Video',
+          cover: data.data.cover,
+          play: data.data.play,
+          hdplay: data.data.hdplay,
+          music: data.data.music,
+          duration: data.data.duration,
+          size: data.data.size,
+          hd_size: data.data.hd_size,
+        })
+        showToast('✅ ভিডিও পাওয়া গেছে!')
+      } else {
+        showToast('❌ ভিডিও খুঁজে পাওয়া যায়নি')
+      }
+    } catch (error) {
+      console.error(error)
+      showToast('❌ সমস্যা হয়েছে — আবার চেষ্টা করুন')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 🎬 Download with Ad
   const downloadVideo = (videoUrl) => {
-    showToast('⏳ Ad দেখার পর ডাউনলোড শুরু হবে...')
-    setTimeout(() => {
+    showToast('⏳ Ad লোড হচ্ছে...')
+
+    const doDownload = () => {
+      showToast('✅ ডাউনলোড শুরু!')
       const link = document.createElement('a')
       link.href = videoUrl
       link.download = 'vidsave-video.mp4'
@@ -84,8 +97,19 @@ const handleFetch = async () => {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      showToast('✅ ডাউনলোড শুরু!')
-    }, 2000)
+    }
+
+    if (window.AdController) {
+      window.AdController.show()
+        .then(() => doDownload())
+        .catch(() => {
+          showToast('⚠️ Ad skip — ডাউনলোড চলছে')
+          doDownload()
+        })
+    } else {
+      // Ad না থাকলে সরাসরি download
+      doDownload()
+    }
   }
 
   const reset = () => {
@@ -98,13 +122,13 @@ const handleFetch = async () => {
       rate: 'https://t.me/foysal_vai_yt_oficial?text=⭐%20Rate%20Us%20Feedback',
       feedback: 'https://t.me/foysal_vai_yt_oficial?text=💬%20Feedback:%20',
       premium: 'https://t.me/foysal_vai_yt_oficial?text=👑%20Premium%20নিতে%20চাই',
-      share: 'https://t.me/share/url?url=https://vidsavebd.vercel.app&text=VidSave BD - সেরা ভিডিও ডাউনলোডার!',
+      share: 'https://t.me/share/url?url=https://bd-reels-frontend-s2ya.vercel.app&text=VidSave BD - সেরা ভিডিও ডাউনলোডার!',
     }
     window.open(links[type], '_blank')
     showToast('📱 Telegram খোলা হচ্ছে...')
   }
 
-  // ===== HOME =====
+  // ============ HOME ============
   const renderHome = () => (
     <>
       <div className="premium-card" onClick={() => setActiveTab('premium')}>
@@ -167,27 +191,28 @@ const handleFetch = async () => {
 
           <h3 className="video-title">{videoInfo.title}</h3>
 
-<div className="quality-options">
-  <button className="quality-btn" onClick={() => downloadVideo(videoInfo.play)}>
-    <span className="quality-label">SD 720p</span>
-    <span className="quality-size">
-      {videoInfo.size ? (videoInfo.size / 1024 / 1024).toFixed(1) + ' MB' : 'N/A'}
-    </span>
-  </button>
-  <button
-    className="quality-btn hd"
-    onClick={() => downloadVideo(videoInfo.hdplay || videoInfo.play)}
-  >
-    <span className="quality-label">HD 1080p</span>
-    <span className="quality-size">
-      {videoInfo.hd_size ? (videoInfo.hd_size / 1024 / 1024).toFixed(1) + ' MB' : 'N/A'}
-    </span>
-  </button>
-  <button className="quality-btn music" onClick={() => downloadVideo(videoInfo.music)}>
-    <span className="quality-label">🎵 MP3</span>
-    <span className="quality-size">Audio</span>
-  </button>
-</div>
+          <div className="quality-options">
+            <button className="quality-btn" onClick={() => downloadVideo(videoInfo.play)}>
+              <span className="quality-label">SD 720p</span>
+              <span className="quality-size">
+                {videoInfo.size ? (videoInfo.size / 1024 / 1024).toFixed(1) + ' MB' : 'N/A'}
+              </span>
+            </button>
+            <button
+              className="quality-btn hd"
+              onClick={() => downloadVideo(videoInfo.hdplay || videoInfo.play)}
+            >
+              <span className="quality-label">HD 1080p</span>
+              <span className="quality-size">
+                {videoInfo.hd_size ? (videoInfo.hd_size / 1024 / 1024).toFixed(1) + ' MB' : 'N/A'}
+              </span>
+            </button>
+            <button className="quality-btn music" onClick={() => downloadVideo(videoInfo.music)}>
+              <span className="quality-label">🎵 MP3</span>
+              <span className="quality-size">Audio</span>
+            </button>
+          </div>
+
           <button className="reset-btn" onClick={reset}>
             ← নতুন লিংক
           </button>
@@ -242,26 +267,23 @@ const handleFetch = async () => {
     </>
   )
 
-  // ===== SEARCH =====
+  // ============ SEARCH ============
   const renderSearch = () => (
     <div className="page-content">
       <div className="page-header">
         <h2 className="page-title">🔍 খুঁজুন</h2>
         <p className="page-sub">প্ল্যাটফর্ম বা ডাউনলোড খুঁজুন</p>
       </div>
-
       <div className="search-box">
         <input type="text" className="search-input" placeholder="কী খুঁজছেন?" />
         <button className="voice-btn">🎤</button>
       </div>
-
       <h3 className="mini-title">জনপ্রিয় সার্চ</h3>
       <div className="tags-grid">
         {['#tiktok', '#instagram', '#reels', '#shorts', '#funny', '#trending'].map((tag) => (
           <span key={tag} className="tag">{tag}</span>
         ))}
       </div>
-
       <h3 className="mini-title">ক্যাটাগরি</h3>
       <div className="categories-list">
         {[
@@ -280,20 +302,18 @@ const handleFetch = async () => {
     </div>
   )
 
-  // ===== DOWNLOAD =====
+  // ============ DOWNLOAD ============
   const renderDownload = () => (
     <div className="page-content">
       <div className="page-header">
         <h2 className="page-title">⬇ ডাউনলোড</h2>
         <p className="page-sub">আপনার সব ডাউনলোড</p>
       </div>
-
       <div className="download-tabs">
         <button className="d-tab active">সব</button>
         <button className="d-tab">চলছে</button>
         <button className="d-tab">সম্পন্ন</button>
       </div>
-
       <div className="recent-list">
         {recentDownloads.map((r, i) => (
           <div key={i} className="recent-item">
@@ -309,7 +329,7 @@ const handleFetch = async () => {
     </div>
   )
 
-  // ===== PREMIUM =====
+  // ============ PREMIUM ============
   const renderPremium = () => (
     <div className="page-content">
       <div className="page-header premium-header">
@@ -317,7 +337,6 @@ const handleFetch = async () => {
         <h2 className="page-title">VidSave Premium</h2>
         <p className="page-sub">Ad-free অভিজ্ঞতা নিন</p>
       </div>
-
       <div className="features-list">
         {[
           'কোনো Ad দেখতে হবে না',
@@ -332,7 +351,6 @@ const handleFetch = async () => {
           </div>
         ))}
       </div>
-
       <div className="pricing-card">
         <div className="price-tag">
           <span className="price">৯৯৳</span>
@@ -342,14 +360,11 @@ const handleFetch = async () => {
           এখনই কিনুন
         </button>
       </div>
-
-      <p className="premium-note">
-        💳 bKash / Nagad / Rocket — সব সাপোর্টেড
-      </p>
+      <p className="premium-note">💳 bKash / Nagad / Rocket — সব সাপোর্টেড</p>
     </div>
   )
 
-  // ===== PROFILE =====
+  // ============ PROFILE ============
   const renderProfile = () => (
     <div className="page-content">
       <div className="profile-header">
@@ -362,7 +377,6 @@ const handleFetch = async () => {
           <div><strong>Free</strong><span>প্ল্যান</span></div>
         </div>
       </div>
-
       <div className="menu-list">
         <div className="menu-item" onClick={() => openTelegram('rate')}>
           <span>⭐</span><span>Rate Us</span><span className="arrow">→</span>
